@@ -47,4 +47,26 @@ router.post('/verifyaccount', function(req, res){
     }    
 });
 
+router.post('/pay', function(req, res){
+    var out;
+    var data = req.body;
+    
+    console.log(data.paymentGridType);
+    
+    if(!data.paymentGridType || data.paymentGridType.trim().length == 0) {
+        out = {'error':true,'message': 'Missing paymentGridType field.','data':[]};
+        return res.json(out);
+    }    
+
+    switch (data.paymentGridType) {
+        case 'PayPal':
+            
+            break;
+    
+        case 'Stripe':
+            break;
+    }
+
+});
+
 module.exports = router;
