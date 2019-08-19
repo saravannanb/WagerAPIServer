@@ -8,6 +8,7 @@ var fs = require('fs');
 var utils = require('../utils.js');
 var PayPal = require('./paypal.js');
 var Stripe  = require('./stripe.js');
+var BraintTree = require('./braintree.js');
 
 
 router.post('/verifycustomer', function(req, res){
@@ -85,6 +86,7 @@ router.post('/pay', function(req, res){
 
 });
 
+//API to verify mapped Bank Account of a Stripe Customer
 router.post('/verifybankaccount', function(req, res){
     var out;
     var data = req.body;
@@ -111,6 +113,15 @@ router.post('/verifybankaccount', function(req, res){
     }
 });
 
+//API to Add Fund to PayPal Customer Wallet
+router.post('/paypal/pay', function(req, res){
+    var data = req.body;    
+    
+    var braintree = new BraintTree();
+
+    return braintree.addFund(data, res);
+});
+
 router.get('/getPaymentOptions', function(req, res){
 
     var paypal = new PayPal();
@@ -122,6 +133,7 @@ router.get('/getPaymentOptions', function(req, res){
     return res.json(paymentOption);
 });
 
+//API to get PayPal payment transaction details
 router.get('/paypalpayments/:id?', function (req,res,next) {
     var out;
     var id = req.params.id;
@@ -131,6 +143,13 @@ router.get('/paypalpayments/:id?', function (req,res,next) {
     out = paypal.getPaymentTransaction(id);
 
     return res.json(out);
+});
+
+//API to get BrainTree Client Token
+router.get('/braintree/clienttoken', function (req, res) {
+    var braintree = new BraintTree();
+
+    return braintree.getClientToken(res);    
 });
 
 module.exports = router;
