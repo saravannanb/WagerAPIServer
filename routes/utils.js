@@ -9,6 +9,7 @@
 var crypto = require('crypto');
 const nodemailer = require('nodemailer');
 var constants = require('../config/constants.js');
+const uuidv4 = require('uuid/v4');
 
 var salt_length = 29;
 var genRandomString = function(length){
@@ -211,6 +212,12 @@ function removePwdFields(data){
     delete data.cpassword;
     delete data.password_hash;
 }
+
+var getUniqueId = function () {
+    var uuid = uuidv4(); //generated random UUID
+    return uuid;
+};
+
 module.exports = {
     validateID: validateID,
     checkMandatory : checkMandatory,
@@ -223,5 +230,6 @@ module.exports = {
     removePwdFields: removePwdFields,
     sendMailFPLink: sendMailFPLink,
     setHashPassword: setHashPassword,
-    to: to
+    to: to,
+    getUniqueId: getUniqueId
 };

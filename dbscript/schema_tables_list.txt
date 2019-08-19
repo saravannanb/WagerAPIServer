@@ -1,0 +1,62 @@
+After the discussion we had, here is the list of tables to be created for the first phase.
+
+User Tables
+	Role
+	UserPersonalTable 
+	UserRatingTable
+	UserPaymentTable
+
+WagerInfo
+	WagerId
+	WagerAcceptanceStatus
+	UserId
+	OpponentId {UserId}
+	ResultAcceptanceStatus
+	DateCreated
+	DateUpdated
+
+Wager
+	UserId
+	WagerId
+	WagerType {free-text for free text and category for category based}
+	WagerTitle
+	WagerDesc
+	WagerOption1
+	WagerOption2
+	WagerAcceptanceDeadline
+	GameId
+	IsPublic {allows anyone to compete for wager}
+	WagerFavoring {WagerOption1 or WagerOption2}
+	Amount
+	ResultStatus
+	DateCreated
+	DateUpdated
+	Status
+
+
+WagerFriends:
+	UserId
+	FriendId
+	GamesPlayed
+	GamesWon
+	IsAnonymous
+	Status (open, active, inactive, blocked)
+
+UserTransaction
+	UserId
+	WagerId
+	Description
+	Credit
+	Debit
+	OpenBalance
+	ClosingBalance
+	DateCreated
+
+Category Tables
+ 	<<To be planned after analyzing the API>>
+
+
+
+
+
+

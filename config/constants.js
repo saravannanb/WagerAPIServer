@@ -14,6 +14,7 @@ var passwordResetUrl = serverUrl + 'users/createpassword/';
 var path = require('path');
 var DEFAULT_COMPANY_ID = 1;
 var EMAILMUST = 1;
+var webClientUrl = 'http://localhost:8000'
 var tables = {
     site_settings:'site_settings',
     roles: 'roles',
@@ -29,7 +30,8 @@ var tables = {
     meal_options: 'meal_options',
     meal_option_items: 'meal_option_items',
     orders: 'orders',
-    order_items: 'order_items'
+    order_items: 'order_items',
+    paypal_payment_Trxn_Log: 'paypal_payment_Trxn_Log'
 };
 var mysqlDUPKEYRegex = /key\s'([^']+)/;//"Duplicate entry 'gsmmgsm@gmail.com' for key 'email'",
 var mblRegex = /^\d{10}$/;
@@ -72,6 +74,11 @@ var smtpDetails = {
         user: 'gsmmgsm@gmail.com',
         pass: 'atleast!Cap1tal@'
     }
+};
+var paypalpaymentstatus = {
+    intiated: 'INITIATED',
+    paid: 'PAID',
+    cancelled: 'CANCELLED'
 };
 
 // create mail transporter
@@ -163,6 +170,7 @@ module.exports = {
     ext_host: ext_host,
     ext_port: ext_port,
     passwordResetUrl: passwordResetUrl,
+    webClientUrl: webClientUrl,
     DEFAULT_COMPANY_ID: DEFAULT_COMPANY_ID,
     EMAILMUST:EMAILMUST,
     rolelevels: rolelevels,
@@ -171,6 +179,7 @@ module.exports = {
     smtpDetails: smtpDetails,
     transporter: transporter,
     sources: sources,
+    paypalpaymentstatus: paypalpaymentstatus,
     mysqlDUPKEYRegex: mysqlDUPKEYRegex,
     mblRegex: mblRegex,
     emailRegex: emailRegex,
@@ -401,5 +410,11 @@ module.exports = {
             truncate: 'delete from ' + tables.item_times + ' where #whrfld in (#0)',
             update_by_id: 'update ' + tables.item_times + ' set start=?,end=?,status=?,modifier_id=? where id=?'
         },
+        paypal_payment_txn_log:{
+            all: 'select * from ' + tables.paypalpaymentTrxnLog,
+            insert: 'insert into ' + tables.paypalpaymentTrxnLog + ' (id, sender_email, recipient_email, amount, status, created_id) values (?,?,?,?,?,?);',
+            get_by_id: 'select * from ' + tables.paypalpaymentTrxnLog + ' where id=?',
+            update_by_id: 'update ' + tables.paypalpaymentTrxnLog + ' set status=?, modified_id=? where id=?'
+        }
     }
 };

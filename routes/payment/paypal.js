@@ -1,81 +1,203 @@
-var paypal = require('paypal-rest-sdk');
-var express = require('express');
-var path = require('path');
-var router = express.Router();
-var http = require('http');
-var fs = require('fs');
-//var _ = require('underscore');
+ /**
+ * Created by ssk on 01/Aug/19.
+ */
+'use strict';
 
-//var constants = require('../config/constants.js');
+var PaypalAdaptive = require('paypal-adaptive');
+var urlEncode = require('urlencode');
 
-//var modelObj = require('../models/');
-
+var utils = require('../utils.js');
+var constants = require('../../config/constants.js');
 var paypal_config = require('../../paymentlib/paypal_config.js');
+var paymentTrxn_modelObj = require('../../models/PayPalPaymentTrxnLog');
 
-paypal.configure(paypal_config);
+class PayPal {
+    constructor() {
+        this.paypal = new PaypalAdaptive(paypal_config);        
+    }
 
-var sender_batch_id = Math.random().toString(36).substring(9);
-
-function createPayoutJson(recipientEmailId, payoutAmount, trxnCurrnecy) {
-    var new_payout_json = {
-        "sender_batch_header": {
-            "sender_batch_id": sender_batch_id,
-            "email_subject": "You have a payment"
-        },
-        "items": [
-            {
-                "recipient_type": "EMAIL",
-                "amount": {
-                    "value": payoutAmount,
-                    "currency": trxnCurrnecy
-                },
-                "receiver": recipientEmailId,
-                "note": "Thank you.",
-                "sender_item_id": "item_1"
+    createPaymentPayloadJson(senderEmailId, recipientEmailId, payoutAmount, trxnCurrnecy, uuid) {
+        var webClientUrl = constants.webClientUrl;
+        
+        var payload = {
+            senderEmail : senderEmailId,
+            requestEnvelope: {
+                errorLanguage:  'en_US'
+            },
+            actionType:     'PAY',
+            currencyCode:   trxnCurrnecy,
+            feesPayer:      'SENDER',
+            memo:           'Chained payment example',
+            cancelUrl:      webClientUrl + '/payment/paypalpaycancel?id=' + urlEncode(uuid),
+            returnUrl:      webClientUrl + '/payment/paypalpaysuccess?id=' + urlEncode(uuid),
+            receiverList: {
+                receiver: [
+                    {
+                        email:  recipientEmailId,
+                        amount: payoutAmount
+                    }
+                ]
             }
-        ]
-    };
-    return new_payout_json;
+        };
+    
+        return payload;
+    }
+    
+    createVerificationPayloadJson(emailId, firstName, lastName) {
+        var payload = {
+            requestEnvelope: {
+                errorLanguage:  'en_US'
+            },
+            emailAddress : emailId,
+            matchCriteria : 'NAME',
+            firstName : firstName,
+            lastName : lastName
+        };
+    
+        return payload;
+    }
+    
+    prepareData(id, data, paymentStatus, operation){
+        var paymentData;
+        
+        if(operation == 'create'){        
+            paymentData = {'id': id,
+                            'senderEmail': data.senderEmailId,
+                            'recipientEmail': data.recipientEmailId,
+                            'amount': data.amount,
+                            'status' : paymentStatus,
+                            'creator_id': data.creator_id
+                        };
+        }
+    
+        if(operation == 'save'){
+            data.id = urlEncode.decode(data.id);
+    
+            paymentData = {'status' : paymentStatus,
+                            'modifier_id': data.modifier_id
+                        };
+        }    
+    
+        return paymentData;
+    }
+
+    async isValidPaymentTransaction(id, cb) {
+        let err, rows, paymentTrxn;
+    
+        //Get the matching Payment Transaction
+        [err, rows] = await paymentTrxn_modelObj.getP(id); 
+    
+        if(err) return cb('Payment transaction: ' + err);
+    
+        paymentTrxn = rows[0];
+    
+        var initiatedStatus = constants.paypalpaymentstatus.intiated;
+
+        if(paymentTrxn.length == 0 || paymentTrxn[0].status != initiatedStatus) {
+            return cb({ext:'Invalid Payment Transaction.'});
+        }
+    
+        return cb(null, paymentTrxn);
+    }
+
+    async addPaymentTransaction(id, data, cb) {
+        let err, rows, paymentTrxn;    
+    
+        data = this.prepareData(id, data, 'create');
+    
+        [err, rows] = await paymentTrxn_modelObj.addP(data);
+        data = rows[0];
+    
+        if(err) return cb('payment transaction: ' + data.id + ' : ' + err, null);
+    
+        paymentTrxn = [data];
+    
+        //Update Recipient's Wallet table
+    
+        return cb(null, paymentTrxn);
+    }
+    
+    async updatePaymentTransaction(data, cb) {
+        let err, rows, paymentTrxn;
+    
+        data = this.prepareData(data.id, data, 'save');
+    
+        [err, rows] = await paymentTrxn_modelObj.updateP(data.id, data);
+        data = rows[0];
+    
+        if(err) return cb('payment transaction: ' + data.id + ' : ' + err, null);
+    
+        paymentTrxn = [data];
+    
+        return cb(null, paymentTrxn);
+    }
+
+    getPaymentOptions() {
+        var out;
+
+        var payKey = 'AP-72B8086302014042D';
+
+        var payload = {
+            payKey: 'AP-72B8086302014042D',
+            requestEnvelope: {
+                detailLevel: 'ReturnAll',
+                errorLanguage:  'en_US'
+            }
+        };
+
+        this.paypal.getPaymentOptions(payload, function (err, response) {
+            if (err) {
+                out = {'error':true,'message':err,'data': response};
+            } else {
+                out = {'error':false,'message':'Payment made successfully','data': response};
+            }
+
+            console.log('out:- ', JSON.stringify(out))
+
+            return JSON.stringify(out);
+        });
+    }
+
+    async getPaymentTransaction(id) {
+        let err, rows, paymentTrxn, out;
+
+        if(id){
+            [err, rows] = await paymentTrxn_modelObj.getP(id); 
+            
+            paymentTrxn = rows[0];
+    
+            if(err) {                
+                out = {'error':true,
+                    'message':'Fetching payment transaction details failed.','data':[err]};
+                console.log(err);                
+            }            
+            else {
+                out = {'error':false,
+                    'message':'Fetched payment transaction details successfully.','data':paymentTrxn};
+                console.log(out);                
+            }
+
+            return out;
+            
+        }else{
+            [err, rows] = await paymentTrxn_modelObj.getAllP();
+            
+            paymentTrxn = rows[0];
+
+            if(err) {                
+                out = {'error':true,
+                    'message':'Fetching payment transaction details failed.','data':[err]};
+                console.log(err);                
+            }            
+            else {
+                out = {'error':false,
+                    'message':'Fetched payment transaction details successfully.','data':paymentTrxn};
+                console.log(out);                
+            }
+
+            return out;
+        }
+    }
 }
 
-router.post('/payout', function(req, res){
-    var out;
-    var data = req.body;
-    
-    data.currency =  (data.hasOwnProperty('currency') ? data.currency : 'USD');
-
-    console.log('Body : ' + req.body);
-    console.log('Email : ' + data.recipientEmailId);
-    console.log('Amount : ' + data.amount);
-    console.log('CCY : ' + data.currency);
-
-    var payout_json = createPayoutJson(data.recipientEmailId, data.amount, data.currency);
-
-    var sync_mode = 'false';
- 
-    paypal.payout.create(payout_json, sync_mode, function (error, payout) {
-        if(error){
-            out = {'error':true,'message':error,'data':[]};
-        }else {
-            out = {'error':false,'message':'Payment made successfully','data':payout};
-        }
-
-        return res.json(out);
-    });
-});
-
-router.get('/', function(req, res){
-    var out;
-
-    paypal.webProfile.get(id, function(error, authorization){
-        if(error){
-            out = {'error':true,'message':error,'data':[]};
-        }else {
-            out = {'error':false,'message':'Payment made successfully','data':payout};
-        }
-
-        return res.json(out);
-    });    
-});
-
-module.exports = router;
+module.exports = PayPal;
